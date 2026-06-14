@@ -185,7 +185,7 @@ export default function BuscarPage() {
         </div>
 
         <div style={styles.botonera}>
-          <button style={styles.boton} onClick={cargarPerfiles}>Buscar</button>
+          <button style={styles.boton} onClick={() => cargarPerfiles()}>Buscar</button>
           <button style={styles.botonSec} onClick={limpiarFiltros}>Limpiar</button>
         </div>
 
