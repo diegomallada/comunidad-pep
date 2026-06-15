@@ -188,7 +188,7 @@ export default function PerfilPage() {
 
         <div style={styles.datos}>
           {perfil.formacion && (
-            <p style={styles.dato}><strong>Formación:</strong> {perfil.formacion}</p>
+            <p style={styles.dato}><strong>Profesión:</strong> {perfil.formacion}</p>
           )}
           {perfil.institucion && (
             <p style={styles.dato}><strong>Institución:</strong> {perfil.institucion}</p>

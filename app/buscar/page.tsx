@@ -96,12 +96,18 @@ export default function BuscarPage() {
       }
       setMiId(user.id);
 
-      // Leemos mi sexo para mostrar solo el opuesto
+      // Leemos mi perfil; si no está completo, al cuestionario
       const { data } = await supabase
         .from("profiles")
-        .select("sexo")
+        .select("sexo, cuestionario_completado")
         .eq("id", user.id)
         .single();
+
+      if (!data?.cuestionario_completado) {
+        router.push("/cuestionario");
+        return;
+      }
+
       const mio = data?.sexo ?? null;
       setMiSexo(mio);
       const opuesto = mio === "Hombre" ? "Mujer" : "Hombre";
@@ -121,6 +127,23 @@ export default function BuscarPage() {
 
   return (
     <main style={styles.main}>
+      <style>{`
+        .rango-input { -webkit-appearance: none; appearance: none; }
+        .rango-input::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 22px; height: 22px; border-radius: 50%;
+          background: #B85C3C; border: 2px solid #FBF4E9;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+          cursor: pointer; pointer-events: auto;
+        }
+        .rango-input::-moz-range-thumb {
+          width: 22px; height: 22px; border-radius: 50%;
+          background: #B85C3C; border: 2px solid #FBF4E9;
+          cursor: pointer; pointer-events: auto;
+        }
+        .rango-input::-webkit-slider-runnable-track { background: transparent; }
+        .rango-input::-moz-range-track { background: transparent; }
+      `}</style>
       <div style={styles.wrap}>
         <header style={styles.header}>
           <h1 style={styles.titulo}>Buscar</h1>
@@ -174,13 +197,44 @@ export default function BuscarPage() {
               ))}
             </select>
           </div>
-          <div style={styles.filtroCampoCorto}>
-            <label style={styles.label}>Edad mín.</label>
-            <input style={styles.input} type="number" value={edadMin} onChange={(e) => setEdadMin(e.target.value)} placeholder="—" />
-          </div>
-          <div style={styles.filtroCampoCorto}>
-            <label style={styles.label}>Edad máx.</label>
-            <input style={styles.input} type="number" value={edadMax} onChange={(e) => setEdadMax(e.target.value)} placeholder="—" />
+          <div style={{ flex: "1 1 100%" }}>
+            <label style={styles.label}>
+              Edad: {edadMin || 18} – {edadMax || 80} años
+            </label>
+            <div style={styles.rangoWrap}>
+              {/* Pista de fondo */}
+              <div style={styles.rangoPista} />
+              {/* Tramo seleccionado resaltado */}
+              <div
+                style={{
+                  ...styles.rangoActivo,
+                  left: `${(((parseInt(edadMin || "18", 10)) - 18) / (80 - 18)) * 100}%`,
+                  right: `${100 - (((parseInt(edadMax || "80", 10)) - 18) / (80 - 18)) * 100}%`,
+                }}
+              />
+              <input
+                type="range"
+                min={18}
+                max={80}
+                value={edadMin || 18}
+                onChange={(e) => {
+                  const v = Math.min(parseInt(e.target.value, 10), parseInt(edadMax || "80", 10));
+                  setEdadMin(v.toString());
+                }}
+                className="rango-input" style={{ ...styles.rangoInput, zIndex: 3 }}
+              />
+              <input
+                type="range"
+                min={18}
+                max={80}
+                value={edadMax || 80}
+                onChange={(e) => {
+                  const v = Math.max(parseInt(e.target.value, 10), parseInt(edadMin || "18", 10));
+                  setEdadMax(v.toString());
+                }}
+                className="rango-input" style={{ ...styles.rangoInput, zIndex: 4 }}
+              />
+            </div>
           </div>
         </div>
 
@@ -214,15 +268,7 @@ export default function BuscarPage() {
                   {p.nombre}
                   {p.edad ? `, ${p.edad}` : ""}
                 </h3>
-                {(p.provincia || p.pais) && (
-                  <p style={styles.dato}>
-                    {[p.provincia, p.pais].filter(Boolean).join(", ")}
-                  </p>
-                )}
-                {p.frecuencia_practica && (
-                  <p style={styles.etiqueta}>{p.frecuencia_practica}</p>
-                )}
-                {p.sobre_mi && <p style={styles.sobreMi}>{p.sobre_mi}</p>}
+                {p.pais && <p style={styles.dato}>{p.pais}</p>}
               </div>
             ))}
           </div>
@@ -262,6 +308,34 @@ const styles: Record<string, React.CSSProperties> = {
   },
   filtroCampo: { flex: "1 1 180px" },
   filtroCampoCorto: { flex: "1 1 90px" },
+  sliderWrap: { display: "flex", flexDirection: "column", gap: "8px", padding: "4px 0" },
+  slider: { width: "100%", accentColor: "#B85C3C", cursor: "pointer" },
+  rangoWrap: { position: "relative", height: "36px", display: "flex", alignItems: "center" },
+  rangoPista: {
+    position: "absolute",
+    left: 0, right: 0,
+    height: "5px",
+    background: "#E0D2BC",
+    borderRadius: "5px",
+  },
+  rangoActivo: {
+    position: "absolute",
+    height: "5px",
+    background: "#B85C3C",
+    borderRadius: "5px",
+  },
+  rangoInput: {
+    position: "absolute",
+    left: 0,
+    width: "100%",
+    margin: 0,
+    background: "transparent",
+    appearance: "none",
+    WebkitAppearance: "none",
+    pointerEvents: "none",
+    accentColor: "#B85C3C",
+    height: "36px",
+  },
   label: { display: "block", color: "#5C5042", fontSize: "13px", marginBottom: "4px" },
   input: {
     width: "100%",

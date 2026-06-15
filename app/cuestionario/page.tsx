@@ -49,6 +49,16 @@ const PAISES = [
   "Otro",
 ];
 
+function calcularEdad(fechaNac: string): number | null {
+  if (!fechaNac) return null;
+  const hoy = new Date();
+  const nac = new Date(fechaNac);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad;
+}
+
 export default function CuestionarioPage() {
   const supabase = createClient();
   const router = useRouter();
@@ -59,7 +69,7 @@ export default function CuestionarioPage() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [nombre, setNombre] = useState("");
-  const [edad, setEdad] = useState("");
+  const [fechaNac, setFechaNac] = useState("");
   const [pais, setPais] = useState("España");
   const [provincia, setProvincia] = useState("");
   const [formacion, setFormacion] = useState("");
@@ -90,7 +100,7 @@ export default function CuestionarioPage() {
         .single();
       if (data) {
         setNombre(data.nombre ?? "");
-        setEdad(data.edad?.toString() ?? "");
+        setFechaNac(data.fecha_nacimiento ?? "");
         setPais(data.pais ?? "España");
         setProvincia(data.provincia ?? "");
         setFormacion(data.formacion ?? "");
@@ -181,12 +191,14 @@ export default function CuestionarioPage() {
   async function guardar() {
     setError(null);
 
-    if (!nombre || !edad || !provincia || !frecuencia || !sexo || !telegram.trim()) {
-      setError("Por favor, completa nombre, edad, provincia, frecuencia, 'soy' y tu usuario de Telegram.");
+    const edadCalc = calcularEdad(fechaNac);
+
+    if (!nombre || !provincia || !frecuencia || !sexo || !telegram.trim() || !sobreMi.trim()) {
+      setError("Por favor, completa todos los campos obligatorios.");
       return;
     }
     if (!fotoUrl) {
-      setError("Añade una foto de perfil para continuar.");
+      setError("Añade una foto de perfil para continuar (obligatorio).");
       return;
     }
 
@@ -197,7 +209,7 @@ export default function CuestionarioPage() {
       .from("profiles")
       .update({
         nombre,
-        edad: parseInt(edad, 10),
+        edad: edadCalc,
         pais,
         provincia,
         formacion,
@@ -218,6 +230,28 @@ export default function CuestionarioPage() {
       return;
     }
     router.push("/buscar");
+  }
+
+  async function eliminarCuenta() {
+    const ok = window.confirm(
+      "¿Seguro que quieres eliminar tu cuenta? Se borrarán tu perfil, tu foto y todos tus datos de forma permanente. Esta acción no se puede deshacer."
+    );
+    if (!ok || !userId) return;
+
+    // Borrar foto del almacenamiento
+    try {
+      await supabase.storage.from("fotos").remove([`${userId}/perfil.jpg`]);
+    } catch {}
+
+    // Borrar likes (dados y recibidos), denuncias propias y el perfil
+    await supabase.from("likes").delete().or(`de_id.eq.${userId},a_id.eq.${userId}`);
+    await supabase.from("denuncias").delete().eq("denunciante_id", userId);
+    await supabase.from("profiles").delete().eq("id", userId);
+
+    // Cerrar sesión y volver a la portada
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
   }
 
   if (cargando) {
@@ -259,10 +293,10 @@ export default function CuestionarioPage() {
           </p>
         </div>
 
-        <label style={styles.label}>Nombre</label>
+        <label style={styles.label}>Nombre (obligatorio)</label>
         <input style={styles.input} value={nombre} onChange={(e) => setNombre(e.target.value)} />
 
-        <label style={styles.label}>Soy</label>
+        <label style={styles.label}>Soy (obligatorio)</label>
         <select style={styles.input} value={sexo} onChange={(e) => setSexo(e.target.value)}>
           <option value="">Elige…</option>
           <option value="Hombre">Hombre</option>
@@ -271,14 +305,16 @@ export default function CuestionarioPage() {
 
         <label style={styles.label}>Edad</label>
         <input
-          style={styles.input}
-          type="number"
-          value={edad}
-          onChange={(e) => setEdad(e.target.value)}
-          placeholder="Ej. 29"
+          style={{ ...styles.input, background: "#F4ECDD", color: "#8A7C6B" }}
+          value={
+            calcularEdad(fechaNac) !== null
+              ? `${calcularEdad(fechaNac)} años`
+              : "Se calcula desde tu fecha de nacimiento"
+          }
+          readOnly
         />
 
-        <label style={styles.label}>País</label>
+        <label style={styles.label}>País (obligatorio)</label>
         <select
           style={styles.input}
           value={pais}
@@ -293,7 +329,7 @@ export default function CuestionarioPage() {
         </select>
 
         <label style={styles.label}>
-          {pais === "España" ? "Provincia" : "Provincia / Región"}
+          {pais === "España" ? "Provincia (obligatorio)" : "Provincia / Región (obligatorio)"}
         </label>
         {pais === "España" ? (
           <select style={styles.input} value={provincia} onChange={(e) => setProvincia(e.target.value)}>
@@ -311,7 +347,7 @@ export default function CuestionarioPage() {
           />
         )}
 
-        <label style={styles.label}>Frecuencia de práctica (misa)</label>
+        <label style={styles.label}>Frecuencia de práctica (misa) (obligatorio)</label>
         <select style={styles.input} value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)}>
           <option value="">Elige…</option>
           {FRECUENCIAS.map((f) => (
@@ -319,12 +355,12 @@ export default function CuestionarioPage() {
           ))}
         </select>
 
-        <label style={styles.label}>Formación (opcional)</label>
+        <label style={styles.label}>Profesión (opcional)</label>
         <input
           style={styles.input}
           value={formacion}
           onChange={(e) => setFormacion(e.target.value)}
-          placeholder="Estudios, cursos…"
+          placeholder="Tu profesión u ocupación"
         />
 
         <label style={styles.label}>¿Perteneces a alguna institución o movimiento? (opcional)</label>
@@ -335,7 +371,7 @@ export default function CuestionarioPage() {
           placeholder="Parroquia, movimiento…"
         />
 
-        <label style={styles.label}>Sobre mí (opcional)</label>
+        <label style={styles.label}>Sobre mí (obligatorio)</label>
         <textarea
           style={{ ...styles.input, minHeight: "100px", resize: "vertical" }}
           value={sobreMi}
@@ -343,7 +379,7 @@ export default function CuestionarioPage() {
           placeholder="Unas líneas sobre ti, tu fe y lo que buscas."
         />
 
-        <label style={styles.label}>Usuario de Telegram</label>
+        <label style={styles.label}>Usuario de Telegram (obligatorio)</label>
         <input
           style={styles.input}
           value={telegram}
@@ -360,6 +396,15 @@ export default function CuestionarioPage() {
         <button style={styles.boton} onClick={guardar} disabled={guardando || subiendoFoto}>
           {guardando ? "Guardando…" : "Guardar y continuar"}
         </button>
+
+        <div style={styles.zonaPeligro}>
+          <button style={styles.botonEliminar} onClick={eliminarCuenta}>
+            Eliminar mi cuenta
+          </button>
+          <p style={styles.notaEliminar}>
+            Borra tu perfil y todos tus datos de forma permanente.
+          </p>
+        </div>
       </div>
     </main>
   );
@@ -474,6 +519,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontStyle: "italic",
     marginTop: "6px",
     lineHeight: 1.5,
+  },
+  zonaPeligro: {
+    marginTop: "32px",
+    paddingTop: "20px",
+    borderTop: "1px solid #EADDC9",
+    textAlign: "center",
+  },
+  botonEliminar: {
+    background: "transparent",
+    border: "1px solid #9A4A2E",
+    color: "#9A4A2E",
+    padding: "10px 20px",
+    borderRadius: "8px",
+    fontSize: "14px",
+    cursor: "pointer",
+  },
+  notaEliminar: {
+    color: "#8A7C6B",
+    fontSize: "12px",
+    marginTop: "8px",
   },
   cargando: { color: "#8A7C6B", fontSize: "16px" },
 };

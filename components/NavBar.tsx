@@ -25,6 +25,10 @@ export default function NavBar() {
     router.refresh();
   }
 
+  function ayuda() {
+    window.open("https://t.me/dimacon", "_blank", "noopener,noreferrer");
+  }
+
   const items = [
     { href: "/buscar", icono: "🔍", texto: "Buscar" },
     { href: "/matches", icono: "💛", texto: "Matches" },
@@ -49,6 +53,10 @@ export default function NavBar() {
           </button>
         );
       })}
+      <button style={styles.item} onClick={ayuda}>
+        <span style={styles.icono}>💬</span>
+        <span style={styles.texto}>Ayuda</span>
+      </button>
       <button style={styles.item} onClick={salir}>
         <span style={styles.icono}>↩️</span>
         <span style={styles.texto}>Salir</span>
